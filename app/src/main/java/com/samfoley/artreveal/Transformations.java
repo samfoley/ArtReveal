@@ -1,6 +1,7 @@
 package com.samfoley.artreveal;
 
 import android.graphics.Bitmap;
+import android.graphics.ColorMatrix;
 import android.util.Log;
 
 import org.opencv.android.Utils;
@@ -92,21 +93,44 @@ public class Transformations {
         }
 
 
-        //Core.gemm(A, transform_matrix, 1.0, transform_matrix, 0.0, A_transformed);
+
         Mat A3 = A.reshape(3);
         Mat A3t = new Mat(A3.size(), A3.type());
         Core.transform(A3, A3t, transform_matrix );
-        /*for(int i = 0; i<channels; i++)
-        {
-            Mat channel = A_transformed.submat(0, A_transformed.rows(), i,i+1);
-            Core.add(channel, new Scalar(transform_offset.get(0,i)), channel);
-        }*/
-       // Mat temp = A_transformed.submat(0,A_transformed.rows(), 0, channels).clone();
+
         A_transformed = A3t.reshape(3, width);
         Mat b = new Mat();
         A_transformed.convertTo(b, CvType.CV_8UC3);
 
-        return b;
+        return transform_matrix;
+    }
+
+    public static ColorMatrix getDecorrelationMatrix(Bitmap image)
+    {
+        Mat imageMatrix = new Mat();
+        Utils.bitmapToMat(image, imageMatrix);
+        Mat t = decorrelationStretch(imageMatrix);
+
+        float[] matrix = {
+                1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f, 0.0f };
+
+        for(int row = 0; row<3; row++)
+        {
+            for(int col = 0; col<3; col++)
+                matrix[row*5 + col] = get(t, row, col);
+            // decorrelationStretch doesn't have alpha channel:
+            matrix[row*5 + 4] = get(t, row, 3);
+        }
+        return new ColorMatrix(matrix);
+    }
+
+    private static float get(Mat mat, int row, int col)
+    {
+        double value = mat.get(row, col)[0];
+        return (float) value;
     }
 
     public static void logMat(Mat mat)
